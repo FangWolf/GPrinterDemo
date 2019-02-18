@@ -39,6 +39,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button btn2;
     Button btn3;
     Button btn4;
+    Button btn5;
     TextView tvUsb;
     private String usbName;
     private PortParameters mPortParam;
@@ -72,11 +73,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btn2 = findViewById(R.id.btn2);
         btn3 = findViewById(R.id.btn3);
         btn4 = findViewById(R.id.btn4);
+        btn5 = findViewById(R.id.btn5);
         tvUsb = findViewById(R.id.tv_usb);
         btn1.setOnClickListener(this);
         btn2.setOnClickListener(this);
         btn3.setOnClickListener(this);
         btn4.setOnClickListener(this);
+        btn5.setOnClickListener(this);
 
         mPortParam = new PortParameters();
 
@@ -203,6 +206,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 } else if (type == GpDevice.STATE_VALID_PRINTER) {
                     Log.e("wolf", "connect status " + "STATE_VALID_PRINTER" + "有效的打印机");
                     mPortParam.setPortOpenState(true);
+                    Toast.makeText(MainActivity.this, "连接好了，可以打印。", Toast.LENGTH_SHORT).show();
                 } else if (type == GpDevice.STATE_INVALID_PRINTER) {
                     Log.e("wolf", "connect status " + "STATE_INVALID_PRINTER" + "无效的打印机");
                 }
@@ -229,6 +233,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
             case R.id.btn4:
                 printReceiptClicked();
+                break;
+            case R.id.btn5:
+                openSesame();
                 break;
 
         }
@@ -297,24 +304,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 switch (mPortParam.getPortType()) {
                     case PortParameters.USB:
                         try {
-                            rel = mGpService.openPort(0, mPortParam.getPortType(),
-                                    mPortParam.getUsbDeviceName(), 0);
+                            rel = mGpService.openPort(0, mPortParam.getPortType(), mPortParam.getUsbDeviceName(), 0);
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         }
                         break;
                     case PortParameters.ETHERNET:
                         try {
-                            rel = mGpService.openPort(0, mPortParam.getPortType(),
-                                    mPortParam.getIpAddr(), mPortParam.getPortNumber());
+                            rel = mGpService.openPort(0, mPortParam.getPortType(), mPortParam.getIpAddr(), mPortParam.getPortNumber());
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         }
                         break;
                     case PortParameters.BLUETOOTH:
                         try {
-                            rel = mGpService.openPort(0, mPortParam.getPortType(),
-                                    mPortParam.getBluetoothAddr(), 0);
+                            rel = mGpService.openPort(0, mPortParam.getPortType(), mPortParam.getBluetoothAddr(), 0);
                         } catch (RemoteException e) {
                             e.printStackTrace();
                         }
@@ -387,7 +391,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         esc.addSetBarcodeHeight((byte) 60); // 设置条码高度为60点
         esc.addSetBarcodeWidth((byte) 1); // 设置条码单元宽度为1
         esc.addCODE128(esc.genCodeB("fangwolf")); // 打印Code128码,条码内容
-        esc.addPrintAndLineFeed();
+
+        // 发送数据
+        Vector<Byte> datas = esc.getCommand();
+        byte[] bytes = GpUtils.ByteTo_byte(datas);
+        String sss = Base64.encodeToString(bytes, Base64.DEFAULT);
+        int rs;
+        try {
+            rs = mGpService.sendEscCommand(mPrinterIndex, sss);
+            GpCom.ERROR_CODE r = GpCom.ERROR_CODE.values()[rs];
+            if (r != GpCom.ERROR_CODE.SUCCESS) {
+                Toast.makeText(getApplicationContext(), GpCom.getErrorText(r), Toast.LENGTH_SHORT).show();
+            }
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void openSesame() {
+        EscCommand esc = new EscCommand();
+        // 开钱箱
+        esc.addGeneratePlus(LabelCommand.FOOT.F5, (byte) 255, (byte) 255);
 
         // 发送数据
         Vector<Byte> datas = esc.getCommand();
