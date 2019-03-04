@@ -30,8 +30,11 @@ import com.gprinter.io.GpDevice;
 import com.gprinter.io.PortParameters;
 import com.gprinter.service.GpPrintService;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Vector;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
@@ -40,6 +43,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     Button btn3;
     Button btn4;
     Button btn5;
+    Button btn6;
     TextView tvUsb;
     private String usbName;
     private PortParameters mPortParam;
@@ -74,12 +78,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btn3 = findViewById(R.id.btn3);
         btn4 = findViewById(R.id.btn4);
         btn5 = findViewById(R.id.btn5);
+        btn6 = findViewById(R.id.btn6);
         tvUsb = findViewById(R.id.tv_usb);
         btn1.setOnClickListener(this);
         btn2.setOnClickListener(this);
         btn3.setOnClickListener(this);
         btn4.setOnClickListener(this);
         btn5.setOnClickListener(this);
+        btn6.setOnClickListener(this);
 
         mPortParam = new PortParameters();
 
@@ -237,6 +243,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case R.id.btn5:
                 openSesame();
                 break;
+            case R.id.btn6:
+                String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis());
+                String message = "这是测试信息，可以是任何文本";
+                List<GoodsBean> goodsBeanList = new ArrayList<>();
+                goodsBeanList.add(new GoodsBean("番茄", "x10", "12.21"));
+                goodsBeanList.add(new GoodsBean("超级好吃的五花肉", "x1", "100.00"));
+                goodsBeanList.add(new GoodsBean("青山绿树小山村家养老土母鸡天然无公害好吃的土鸡蛋", "x100000", "10000.00"));
+                analogTicket(time, message, goodsBeanList);
+                break;
 
         }
 
@@ -384,7 +399,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void printTicket() {
         EscCommand esc = new EscCommand();
         esc.addInitializePrinter();
-
+        esc.addPrintAndFeedLines((byte) 3);
         /* 打印一维条码 */
         esc.addSelectPrintingPositionForHRICharacters(EscCommand.HRI_POSITION.BELOW);//
         // 设置条码可识别字符位置在条码下方
@@ -492,6 +507,80 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         esc.addPrintAndFeedLines((byte) 8);
 
         Vector<Byte> datas = esc.getCommand(); // 发送数据
+        byte[] bytes = GpUtils.ByteTo_byte(datas);
+        String sss = Base64.encodeToString(bytes, Base64.DEFAULT);
+        int rs;
+        try {
+            rs = mGpService.sendEscCommand(mPrinterIndex, sss);
+            GpCom.ERROR_CODE r = GpCom.ERROR_CODE.values()[rs];
+            if (r != GpCom.ERROR_CODE.SUCCESS) {
+                Toast.makeText(getApplicationContext(), GpCom.getErrorText(r), Toast.LENGTH_SHORT).show();
+            }
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 模拟打印小票
+     * 对于商品名过长的问题，对长字符串进行分割，让他在指定位置换行
+     *
+     * @param time
+     * @param message
+     * @param goodsBeanList
+     */
+    private void analogTicket(String time, String message, List<GoodsBean> goodsBeanList) {
+        EscCommand esc = new EscCommand();
+        esc.addInitializePrinter();
+//        esc.addPrintAndFeedLines((byte) 3);
+        /*打印文本*/
+//        esc.addText("--------------------------------");//32 * -
+//        esc.addText("12345678912345678912345678912345");//32
+//        esc.addText("一二三四五六七八九十一二三四五六");//16
+//        esc.addText("abcdefghijklmnopqrstuvwxyzabcdef");//32
+//        esc.addText("ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEF");//32
+
+        esc.addText("--------------------------------");//32 * -
+        esc.addSelectJustification(EscCommand.JUSTIFICATION.CENTER);
+        esc.addText("订单信息");
+        esc.addPrintAndLineFeed();
+        esc.addSelectJustification(EscCommand.JUSTIFICATION.LEFT);
+        esc.addText("订单时间：" + time + "\n");
+        esc.addText("下单门店：" + message + "\n");
+        esc.addText("下单备注：" + message + "\n");
+        esc.addText("--------------------------------\n");//32 * -
+        esc.addText("名称          数量          价格\n");//间隔10空格
+        for (int i = 0; i < goodsBeanList.size(); i++) {
+            if (goodsBeanList.get(i).name.length() < 8) {
+                esc.addText(goodsBeanList.get(i).name);
+                esc.addSetAbsolutePrintPosition((short) 169);
+                esc.addText(goodsBeanList.get(i).amount);
+                esc.addSetAbsolutePrintPosition((short) 288);
+                esc.addText(goodsBeanList.get(i).price);
+            } else {
+                int start = 7;
+                int end = 14;
+                int length = goodsBeanList.get(i).name.length();
+                String temp = goodsBeanList.get(i).name.substring(0, 7) + "\n";
+                for (int j = 0; j < length / 7 - 1; j++) {
+                    temp += goodsBeanList.get(i).name.substring(start, end) + "\n";
+                    start += 7;
+                    end += 7;
+                }
+                temp += goodsBeanList.get(i).name.substring(start, length);
+                esc.addText(temp);
+                esc.addSetAbsolutePrintPosition((short) 169);
+                esc.addText(goodsBeanList.get(i).amount);
+                esc.addSetAbsolutePrintPosition((short) 288);
+                esc.addText(goodsBeanList.get(i).price);
+            }
+            esc.addPrintAndLineFeed();
+        }
+        esc.addText("--------------------------------");
+        esc.addPrintAndLineFeed();
+
+        // 发送数据
+        Vector<Byte> datas = esc.getCommand();
         byte[] bytes = GpUtils.ByteTo_byte(datas);
         String sss = Base64.encodeToString(bytes, Base64.DEFAULT);
         int rs;
