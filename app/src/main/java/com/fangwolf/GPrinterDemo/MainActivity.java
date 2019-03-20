@@ -114,6 +114,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         this.registerReceiver(PrinterStatusBroadcastReceiver, filter);
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (conn != null) {
+            unbindService(conn);
+        }
+        unregisterReceiver(mBroadcastReceiver);
+    }
+
     //打印机状态广播
     private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -212,7 +221,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 } else if (type == GpDevice.STATE_VALID_PRINTER) {
                     Log.e("wolf", "connect status " + "STATE_VALID_PRINTER" + "有效的打印机");
                     mPortParam.setPortOpenState(true);
-                    Toast.makeText(MainActivity.this, "连接好了，可以打印。", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "连接好了，可以打印。", Toast.LENGTH_LONG).show();
                 } else if (type == GpDevice.STATE_INVALID_PRINTER) {
                     Log.e("wolf", "connect status " + "STATE_INVALID_PRINTER" + "无效的打印机");
                 }
@@ -245,12 +254,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
             case R.id.btn6:
                 String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(System.currentTimeMillis());
-                String message = "这是测试信息，可以是任何文本";
+                String message = "一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十去";
                 List<GoodsBean> goodsBeanList = new ArrayList<>();
                 goodsBeanList.add(new GoodsBean("番茄", "x10", "12.21"));
                 goodsBeanList.add(new GoodsBean("超级好吃的五花肉", "x1", "100.00"));
                 goodsBeanList.add(new GoodsBean("青山绿树小山村家养老土母鸡天然无公害好吃的土鸡蛋", "x100000", "10000.00"));
-                analogTicket(time, message, goodsBeanList);
+                goodsBeanList.add(new GoodsBean("茄子", "x10", "1000.00"));
+                analogTicket("2019-11-11 11:11:11", message, goodsBeanList);
                 break;
 
         }
@@ -552,12 +562,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         esc.addText("名称          数量          价格\n");//间隔10空格
         for (int i = 0; i < goodsBeanList.size(); i++) {
             if (goodsBeanList.get(i).name.length() < 8) {
+                esc.addSelectJustification(EscCommand.JUSTIFICATION.LEFT);
                 esc.addText(goodsBeanList.get(i).name);
                 esc.addSetAbsolutePrintPosition((short) 169);
                 esc.addText(goodsBeanList.get(i).amount);
                 esc.addSetAbsolutePrintPosition((short) 288);
+                esc.addSelectJustification(EscCommand.JUSTIFICATION.RIGHT);
                 esc.addText(goodsBeanList.get(i).price);
+                esc.addPrintAndLineFeed();
             } else {
+                esc.addSelectJustification(EscCommand.JUSTIFICATION.LEFT);
                 int start = 7;
                 int end = 14;
                 int length = goodsBeanList.get(i).name.length();
@@ -567,14 +581,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     start += 7;
                     end += 7;
                 }
+                //字数=整几行的情况没有考虑
                 temp += goodsBeanList.get(i).name.substring(start, length);
                 esc.addText(temp);
                 esc.addSetAbsolutePrintPosition((short) 169);
                 esc.addText(goodsBeanList.get(i).amount);
                 esc.addSetAbsolutePrintPosition((short) 288);
+                esc.addSelectJustification(EscCommand.JUSTIFICATION.RIGHT);
                 esc.addText(goodsBeanList.get(i).price);
+                esc.addPrintAndLineFeed();
+                esc.addSelectJustification(EscCommand.JUSTIFICATION.LEFT);
             }
-            esc.addPrintAndLineFeed();
+
         }
         esc.addText("--------------------------------");
         esc.addPrintAndLineFeed();
